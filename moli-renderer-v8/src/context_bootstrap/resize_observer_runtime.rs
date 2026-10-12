@@ -10,8 +10,8 @@ use crate::webidl;
 use entry::ResizeObserverEntryData;
 pub(super) use entry::install_resize_observer_entry_template_bindings;
 use moli_webapi_declare::WebApiObject;
-use webidl::WebIdlDictionarySerialize;
 pub(crate) use realtime::{broadcast_realtime_resize_observer, gather_realtime_resize_observers};
+use webidl::WebIdlDictionarySerialize;
 
 const RESIZE_OBSERVER_QUEUE_SLOT: &str = "__moliResizeObserverQueue";
 const RESIZE_OBSERVER_REGISTRY_SLOT: &str = "__moliResizeObservers";
@@ -88,7 +88,7 @@ struct ResizeObserverUnobserveArgs<'s> {
     target: v8::Local<'s, v8::Object>,
 }
 
-#[derive(Clone, Copy, Default, webidl::WebIdlEnum)]
+#[derive(Clone, Copy, Default, Eq, PartialEq, webidl::WebIdlEnum)]
 #[webidl(name = "ResizeObserverBoxOptions", rename_all = "kebab-case")]
 enum ResizeObserverBoxOptions {
     #[default]
@@ -147,7 +147,12 @@ pub(super) fn resize_observer_constructor_callback<'s>(
     )
     .initialize(scope, args.this())
     .expect("ResizeObserver declaration should initialize object");
-    crate::observer_runtime::register_realtime_resize_observer(unsafe { &*host_ptr }, callback_id);
+    if let Some(host_ptr) = context_host_ptr_from_global_bridge(scope) {
+        crate::observer_runtime::register_realtime_resize_observer(
+            unsafe { &*host_ptr },
+            callback_id,
+        );
+    }
     rv.set(args.this().into());
 }
 
