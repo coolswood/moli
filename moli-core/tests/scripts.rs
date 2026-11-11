@@ -1111,7 +1111,7 @@ async fn phase_two_shared_blocking_stylesheet_keeps_parser_owned_defer_phase_ord
         .await?;
 
     assert_eq!(
-        diagnostic_global(&page, "sharedBlockingDeferBlockedEnough"),
+        diagnostic_global(&page, "sharedBlockingDeferStylesReady"),
         Some(&JsValueSnapshot::Bool(true))
     );
     assert_eq!(
@@ -1136,7 +1136,7 @@ async fn phase_two_shared_blocking_stylesheet_keeps_parser_owned_module_phase_or
         .await?;
 
     assert_eq!(
-        diagnostic_global(&page, "sharedBlockingModuleBlockedEnough"),
+        diagnostic_global(&page, "sharedBlockingModuleStylesReady"),
         Some(&JsValueSnapshot::Bool(true))
     );
     assert_eq!(

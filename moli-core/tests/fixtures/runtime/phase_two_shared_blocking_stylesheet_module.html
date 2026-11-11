@@ -2,13 +2,16 @@
 <html>
   <head>
     <script>
-      window.sharedBlockingModuleStart = Date.now();
       window.sharedBlockingModuleOrder = [];
+      window.sharedBlockingModuleStylesReady = true;
+      window.sharedBlockingModuleOrder.push = function(value) {
+        if (value === "module-left" || value === "module-right") {
+          window.sharedBlockingModuleStylesReady &&=
+            getComputedStyle(document.body).color === "rgb(1, 2, 3)";
+        }
+        return Array.prototype.push.call(this, value);
+      };
       document.addEventListener("DOMContentLoaded", () => {
-        window.sharedBlockingModuleElapsed =
-          Date.now() - window.sharedBlockingModuleStart;
-        window.sharedBlockingModuleBlockedEnough =
-          window.sharedBlockingModuleElapsed >= 50;
         window.sharedBlockingModuleOrder.push("dcl");
         window.sharedBlockingModuleOrderResult =
           window.sharedBlockingModuleOrder.join(",");
