@@ -9,11 +9,10 @@ pub use network_context::NetworkStorageAccessStatus;
 pub use network_context::{
     BrowserCookieFacadeContext, BrowserCookieFacadeContextOverrides, BrowserCookieFacadeOverrides,
     BrowserCookieStorageAccessStatus, CookieSource, NetworkCookieRequestContext,
-    NetworkCookieRequestType, NetworkSameSiteContext, NetworkSameSiteHttpMethod,
-    NetworkSameSiteRedirectType, NetworkSiteContextMetadata, NetworkSiteContextTrackMetadata,
-    advance_cookie_request_context, core_browser_site_context_from_facade,
-    core_same_site_context_metadata_from_stored, redirect_types_for_request,
-    site_context_downgrade_type,
+    NetworkSameSiteContext, NetworkSameSiteHttpMethod, NetworkSameSiteRedirectType,
+    NetworkSiteContextMetadata, NetworkSiteContextTrackMetadata, advance_cookie_request_context,
+    core_browser_site_context_from_facade, core_same_site_context_metadata_from_stored,
+    redirect_types_for_request, site_context_downgrade_type,
 };
 pub use query_report::{
     StoredCookieAccess, StoredCookieAccessSemantics, StoredCookieBrowserContextValueSource,
