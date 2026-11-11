@@ -2829,9 +2829,11 @@ mod tests {
             let _ = sender.send(reply);
         })?;
         receive(receiver)?;
+        let sql_store_id = client.allocate_store_id().unwrap();
         execute(
             &client,
             Command::CreateStore {
+                store: sql_store_id,
                 transaction,
                 name: "items".into(),
                 options: ObjectStoreOptions::default(),
@@ -2841,7 +2843,7 @@ mod tests {
             &client,
             Command::Write {
                 transaction,
-                store: "items".into(),
+                store: sql_store_id,
                 key: Some(Key::from("alpha")),
                 value: b"record".to_vec().into(),
                 indexes: vec![],
