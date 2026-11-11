@@ -3314,34 +3314,76 @@ async fn window_fetch_returns_before_slow_network_response() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn async_xhr_send_returns_before_slow_network_response() -> Result<()> {
-    let server = FixtureServer::spawn().await?;
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let base_url = format!("http://{}", listener.local_addr()?);
+    let (requested_tx, requested_rx) = oneshot::channel();
+    let (release_tx, release_rx) = oneshot::channel();
+    let server = tokio::spawn(async move {
+        let mut requested_tx = Some(requested_tx);
+        let mut release_rx = Some(release_rx);
+        for (path, mime, body) in [
+            (
+                "/static",
+                "text/html",
+                "<!doctype html><body>async XHR</body>",
+            ),
+            ("/wait-until-slow-data", "text/plain", "settled-slow"),
+        ] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                head.push(stream.read_u8().await.unwrap());
+            }
+            assert!(String::from_utf8_lossy(&head).starts_with(&format!("GET {path} ")));
+            if path == "/wait-until-slow-data" {
+                requested_tx.take().unwrap().send(()).unwrap();
+                release_rx.take().unwrap().await.unwrap();
+            }
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+            stream.shutdown().await.unwrap();
+        }
+    });
     let browser = Browser::new(AppConfig::default())?;
 
     let mut page = browser
         .fetch_with_wait_until(
-            &server.url("/static"),
+            &format!("{base_url}/static"),
             RenderedDomWaitUntil::Load,
             Duration::from_secs(5),
         )
         .await?;
 
-    let started = std::time::Instant::now();
-    let value = page
-        .evaluate_runtime_expression_async(
-            "const xhr = new XMLHttpRequest(); xhr.open('GET', '/wait-until-slow-data'); xhr.onload = () => { document.body.setAttribute('data-xhr-state', xhr.responseText); }; xhr.send(); document.body.setAttribute('data-xhr-returned', '1'); 'returned';",
-        )
-        .await?;
-    assert_eq!(value["value"], serde_json::json!("returned"));
-    assert!(
-        started.elapsed() < Duration::from_millis(200),
-        "async XMLHttpRequest.send() should not wait for the network response"
+    // The response stays withheld until evaluation returns, so a blocking
+    // send cannot pass regardless of how the host schedules this test.
+    let evaluation = page.evaluate_runtime_expression_async(
+        "const xhr = new XMLHttpRequest(); xhr.open('GET', '/wait-until-slow-data'); xhr.onload = () => { document.body.setAttribute('data-xhr-state', xhr.responseText); }; xhr.send(); document.body.setAttribute('data-xhr-returned', '1'); 'returned';",
     );
+    let value = tokio::time::timeout(Duration::from_secs(5), evaluation)
+        .await
+        .context("async XMLHttpRequest.send() waited for the held response")??;
+    assert_eq!(value["value"], serde_json::json!("returned"));
+    tokio::time::timeout(Duration::from_secs(5), requested_rx)
+        .await
+        .context("the async XHR must reach the server")??;
     assert!(
         page.serialize_html_async()
             .await?
             .contains("data-xhr-returned=\"1\"")
     );
 
+    assert!(
+        !page
+            .serialize_html_async()
+            .await?
+            .contains("data-xhr-state=")
+    );
+    release_tx
+        .send(())
+        .expect("the response gate must remain live");
     browser
         .wait_for_page_network_idle(&mut page, Duration::from_secs(2))
         .await?;
@@ -3351,7 +3393,7 @@ async fn async_xhr_send_returns_before_slow_network_response() -> Result<()> {
             .contains("data-xhr-state=\"settled-slow\"")
     );
 
-    server.shutdown().await;
+    server.await?;
     Ok(())
 }
 
